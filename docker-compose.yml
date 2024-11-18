@@ -1,0 +1,65 @@
+
+services:
+  runningspeedbot:
+    image: runningspeedbot
+    build:
+      context: .
+      dockerfile: ./Dockerfile
+    env_file:
+      - .env
+    environment:
+      - PYTHONPATH=/app
+    depends_on:
+      redis:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./logs:/app/logs
+      - ./alembic/versions:/app/alembic/versions  # Монтируем папку versions
+    networks:
+      - app_network
+    command: >
+      sh -c "python app/main.py"
+
+  
+  redis:
+    image: "redis:alpine"
+    ports:
+      - "6379:6379"
+    volumes:
+      - ./redis_data:/data
+    networks:
+      - app_network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 5s
+
+  postgres:
+    image: "postgres:alpine"
+    env_file:
+      - .env
+    environment:
+      POSTGRES_DB: running_speed_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - ./postgres_data:/var/lib/postgresql/data
+    networks:
+      - app_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $POSTGRES_USER"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 5s
+
+volumes:
+  redis_data:
+  postgres_data:
+
+networks:
+  app_network:
